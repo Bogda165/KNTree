@@ -1,9 +1,11 @@
 import copy
 import heapq
+from collections import defaultdict
 
 import numpy as np
 import matplotlib.pyplot as plt
 import random
+from scipy.spatial import KDTree as kt
 
 size = 5000
 
@@ -18,6 +20,11 @@ color_dict = {
 def calibrate_i(index: int) -> int:
     return index + size
 
+def decalibrate_i(index: int) -> int:
+    return index - size
+
+import heapq  # Import for k-nearest neighbors
+
 class KDTreeNode:
     def __init__(self, point, left=None, right=None):
         self.point = point  # The 2D point (x, y) stored in this node
@@ -30,12 +37,10 @@ class KDTree:
         self.root = None
 
     def insert(self, point, depth=0):
-        """Insert a new point into the KD-tree."""
         def _insert(node, point, depth):
             if node is None:
                 return KDTreeNode(point)
 
-            # Alternate between x and y axis
             axis = depth % 2
             if point[axis] < node.point[axis]:
                 node.left = _insert(node.left, point, depth + 1)
@@ -46,37 +51,31 @@ class KDTree:
         self.root = _insert(self.root, point, depth)
 
     def nearest_neighbor(self, target, depth=0, best=None):
-        """Find the nearest neighbor for a target point."""
         def _nearest(node, target, depth, best):
             if node is None:
                 return best
 
-            # Compute squared distance to avoid unnecessary sqrt calls
             point = node.point
             dist = (point[0] - target[0]) ** 2 + (point[1] - target[1]) ** 2
             if best is None or dist < best[1]:
                 best = (node.point, dist)
 
-            # Determine which side of the split line to search
             axis = depth % 2
             next_branch = node.left if target[axis] < point[axis] else node.right
             opposite_branch = node.right if target[axis] < point[axis] else node.left
 
-            # Search the nearest branch
             best = _nearest(next_branch, target, depth + 1, best)
 
-            # Check if we need to search the opposite branch
             if (target[axis] - point[axis]) ** 2 < best[1]:
                 best = _nearest(opposite_branch, target, depth + 1, best)
 
             return best
 
         best = _nearest(self.root, target, depth, best)
-        return best[0]  # Return only the point, not the distance
+        return best[0]
 
     def k_nearest_neighbors(self, target, k, depth=0):
-        """Find the k nearest neighbors for a target point."""
-        heap = []  # Max-heap to store the k nearest neighbors
+        heap = []
 
         def _k_nearest(node, target, depth):
             if node is None:
@@ -85,29 +84,23 @@ class KDTree:
             point = node.point
             dist = (point[0] - target[0]) ** 2 + (point[1] - target[1]) ** 2
 
-            # If the heap is not full, add the current point
             if len(heap) < k:
                 heapq.heappush(heap, (-dist, point))
             else:
-                # If the heap is full and current point is closer, replace the farthest point
                 if dist < -heap[0][0]:
                     heapq.heappushpop(heap, (-dist, point))
 
-            # Determine which side of the split line to search
             axis = depth % 2
             next_branch = node.left if target[axis] < point[axis] else node.right
             opposite_branch = node.right if target[axis] < point[axis] else node.left
 
-            # Search the nearest branch
             _k_nearest(next_branch, target, depth + 1)
 
-            # Check if we need to search the opposite branch
             if (target[axis] - point[axis]) ** 2 < -heap[0][0] or len(heap) < k:
                 _k_nearest(opposite_branch, target, depth + 1)
 
         _k_nearest(self.root, target, depth)
         return [point for _, point in sorted(heap, reverse=True)]
-
 
 class Point:
     def __init__(self, x=0, y=0, color = -1):
@@ -132,10 +125,11 @@ class Matrix:
             self.point_map[key] = Point(x, y, color)
         return True
 
-    def add_point_force(self, color = -1):
+
+    def add_point_force(self, x1, x2, y1, y2, color = -1,):
         while True:
-            x = random.randint(0, size * 2 + 1)
-            y = random.randint(0, size * 2 + 1)
+            x = random.randint(x1, x2)
+            y = random.randint(y1, y2)
             if self.add_point(x, y, color):
                 break
 
@@ -201,33 +195,107 @@ class Matrix:
         plt.title("Field of Points with Colors")
         plt.grid(True)
         plt.show()
+def calculate_accuracy(matrix):
+    dic = {
+        1: [0, 0],
+        2: [0, 0],
+        3: [0, 0],
+        4: [0, 0]
+    }
 
-def color(matrix, k = 1):
+    for point in matrix.point_map.values():
+        if point.color == 0:
+            #red
+            if point.x < calibrate_i(500) and point.y < calibrate_i(500):
+                dic[1][1] += 1
+            dic[1][0] += 1
+        elif point.color == 1:
+            #green
+            if point.x > calibrate_i(-500) and point.y < calibrate_i(500):
+                dic[2][1] += 1
+            dic[2][0] += 1
+        elif point.color == 2:
+            if point.x < calibrate_i(500) and point.y > calibrate_i(-500):
+                dic[3][1] += 1
+            dic[3][0] += 1
+        elif point.color == 3:
+            if point.x > calibrate_i(-500) and point.y > calibrate_i(-500):
+                dic[4][1] += 1
+            dic[4][0] += 1
+        else:
+            print("Error")
+
+    return dic
+
+def print_statistics(dic):
+    _return = []
+    for key in dic:
+        total = dic[key][0]
+        count = dic[key][1]
+        percentage = (count / total) * 100 if total > 0 else 0
+        _return += f"Color {key}: {count}/{total} ({percentage:.2f}%)" + "\n"
+    return _return
+
+def color(matrix, k):
     tree = KDTree()
     for point in matrix.point_map.values():
         if point.color == -1:
             nearest = tree.k_nearest_neighbors((point.x, point.y), k)
-            dic = {}
+            _dic = defaultdict(float)
+            #print(point, "-> ")
             for neighbor in nearest:
                 _point = matrix.point_map[(neighbor[0], neighbor[1])]
-                dic[_point.color] = dic.get(_point.color, 0) + 1
+                #print(_point)
+                distance = np.sqrt((point.x - _point.x) ** 2 + (point.y - _point.y) ** 2)
+                weight = 1 / (distance + 1e-5)  # Add a small value to avoid division by zero
+                _dic[_point.color] += weight
 
-            point.color = max(dic, key=dic.get)
-            _color = max(dic, key=dic.get)
-            point.color = _color
+            point.color = max(_dic, key=_dic.get)
         tree.insert((point.x, point.y))
-    matrix.display_field()
+    return matrix
+
+def _color(matrix, k):
+    tree = KDTree()
+    for point in matrix.point_map.values():
+        if point.color == -1:
+            nearest = tree.k_nearest_neighbors((point.x, point.y), k)
+            _dic = defaultdict(float)
+            #print(point, "-> ")
+            for neighbor in nearest:
+                _point = matrix.point_map[(neighbor[0], neighbor[1])]
+                #print(_point)
+                distance = np.sqrt((point.x - _point.x) ** 2 + (point.y - _point.y) ** 2)
+                weight = 1 / (distance + 1e-5)  # Add a small value to avoid division by zero
+                _dic[_point.color] += weight
+
+            point.color = max(_dic, key=_dic.get)
+        tree.insert((point.x, point.y))
+    return matrix
 
 
-# Example usage
-matrix = Matrix()
-matrix.basi_init()
+def main() :
+    # Example usage
+    matrix = Matrix()
+    matrix.basi_init()
 
-for i in range(0, 40000):
-    matrix.add_point_force(-1)
+    dic = {
+        0: [-5000, 500, -5000, 500],
+        1: [-500, 5000, -5000, 500],
+        2: [-5000, 500, -500, 5000],
+        3: [-500, 5000, -500, 5000]
+    }
 
-print("added")
-color(copy.deepcopy(matrix), 1)
-color(copy.deepcopy(matrix), 3)
-color(copy.deepcopy(matrix), 7)
-color(copy.deepcopy(matrix), 15)
+    for i in range(0, 40000):
+        matrix.add_point_force(calibrate_i(dic[i % 4][0]), calibrate_i(dic[i % 4][1]), calibrate_i(dic[i % 4][2]), calibrate_i(dic[i % 4][3]), -1)
+
+    ks = [1, 3, 7, 15]
+
+    for i in ks:
+        print(f"K = {i}")
+        k = color(copy.deepcopy(matrix), i)
+        k.display_field()
+        print("".join(print_statistics(calculate_accuracy(k))))
+
+
+if __name__ == "__main__":
+    main()
