@@ -1,11 +1,12 @@
 import copy
+import random
 from collections import defaultdict
 
 import numpy as np
 from KDTree.kdTree import KDTree
 from Matrix.matrix import Matrix
 
-size = 4000
+size = 5000
 
 def basi_init(matrix):
     # Initialize points for "R"
@@ -14,11 +15,6 @@ def basi_init(matrix):
     matrix.add_point(calibrate_i(-1800), calibrate_i(-2400), 0),
     matrix.add_point(calibrate_i(-2000), calibrate_i(-1400), 0),
     matrix.add_point(calibrate_i(-2500), calibrate_i(-3400), 0),
-    matrix.add_point(calibrate_i(-4501), calibrate_i(-4401), 0),
-    matrix.add_point(calibrate_i(-4101), calibrate_i(-3001), 0),
-    matrix.add_point(calibrate_i(-1801), calibrate_i(-2401), 0),
-    matrix.add_point(calibrate_i(-2001), calibrate_i(-1401), 0),
-    matrix.add_point(calibrate_i(-2501), calibrate_i(-3401), 0)
 
     # Initialize points for "G"
     matrix.add_point(calibrate_i(4500), calibrate_i(-4400), 1),
@@ -27,11 +23,6 @@ def basi_init(matrix):
     matrix.add_point(calibrate_i(2500), calibrate_i(-3400), 1),
     matrix.add_point(calibrate_i(2000), calibrate_i(-1400), 1),
 
-    matrix.add_point(calibrate_i(4501), calibrate_i(-4401), 1),
-    matrix.add_point(calibrate_i(4101), calibrate_i(-3001), 1),
-    matrix.add_point(calibrate_i(1801), calibrate_i(-2401), 1),
-    matrix.add_point(calibrate_i(2501), calibrate_i(-3401), 1),
-    matrix.add_point(calibrate_i(2001), calibrate_i(-1401), 1)
 
     # Initialize points for "B"
     matrix.add_point(calibrate_i(-4500), calibrate_i(4400), 2),
@@ -40,11 +31,6 @@ def basi_init(matrix):
     matrix.add_point(calibrate_i(-2500), calibrate_i(3400), 2),
     matrix.add_point(calibrate_i(-2000), calibrate_i(1400), 2),
 
-    matrix.add_point(calibrate_i(-4501), calibrate_i(4401), 2),
-    matrix.add_point(calibrate_i(-4101), calibrate_i(3001), 2),
-    matrix.add_point(calibrate_i(-1801), calibrate_i(2401), 2),
-    matrix.add_point(calibrate_i(-2501), calibrate_i(3401), 2),
-    matrix.add_point(calibrate_i(-2001), calibrate_i(1401), 2)
 
     # Initialize points for "P"
     matrix.add_point(calibrate_i(4500), calibrate_i(4400), 3),
@@ -53,11 +39,6 @@ def basi_init(matrix):
     matrix.add_point(calibrate_i(2500), calibrate_i(3400), 3),
     matrix.add_point(calibrate_i(2000), calibrate_i(1400), 3),
 
-    matrix.add_point(calibrate_i(4501), calibrate_i(4401), 3),
-    matrix.add_point(calibrate_i(4101), calibrate_i(3001), 3),
-    matrix.add_point(calibrate_i(1801), calibrate_i(2401), 3),
-    matrix.add_point(calibrate_i(2501), calibrate_i(3401), 3),
-    matrix.add_point(calibrate_i(2001), calibrate_i(1401), 3)
 
 def calibrate_i(index: int) -> int:
     return index + size
@@ -113,30 +94,10 @@ def color(matrix, k):
         if point.color == -1:
             nearest = tree.k_nearest_neighbors((point.x, point.y), k)
             _dic = defaultdict(float)
-            #print(point, "-> ")
             for neighbor in nearest:
                 _point = matrix.point_map[(neighbor[0], neighbor[1])]
-                #print(_point)
                 distance = np.sqrt((point.x - _point.x) ** 2 + (point.y - _point.y) ** 2)
                 weight = 1 / (distance + 1e-5)
-                _dic[_point.color] += weight
-
-            point.color = max(_dic, key=_dic.get)
-        tree.insert((point.x, point.y))
-    return matrix
-
-def _color(matrix, k):
-    tree = KDTree()
-    for point in matrix.point_map.values():
-        if point.color == -1:
-            nearest = tree.k_nearest_neighbors((point.x, point.y), k)
-            _dic = defaultdict(float)
-            #print(point, "-> ")
-            for neighbor in nearest:
-                _point = matrix.point_map[(neighbor[0], neighbor[1])]
-                #print(_point)
-                distance = np.sqrt((point.x - _point.x) ** 2 + (point.y - _point.y) ** 2)
-                weight = 1 / (distance + 1e-5)  # Add a small value to avoid division by zero
                 _dic[_point.color] += weight
 
             point.color = max(_dic, key=_dic.get)
@@ -156,10 +117,17 @@ def main() :
         3: [-size / 10, size, -size / 10, size]
     }
 
-    for i in range(0, 40000):
-        matrix.add_point_force(calibrate_i(dic[i % 4][0]), calibrate_i(dic[i % 4][1]), calibrate_i(dic[i % 4][2]), calibrate_i(dic[i % 4][3]), -1)
+    prev = 0
 
-    ks = [1, 3, 7, 15, 30]
+    for i in range(0, 40000):
+        curr = random.randint(0, 3)
+        if curr == prev:
+            curr += 1
+            curr %= 4
+        matrix.add_point_force(calibrate_i(dic[curr][0]), calibrate_i(dic[curr][1]), calibrate_i(dic[curr][2]), calibrate_i(dic[curr][3]), -1)
+        prev = curr
+
+    ks = [1, 3, 7, 15]
 
     for i in ks:
         print(f"K = {i}")

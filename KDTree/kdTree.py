@@ -1,10 +1,10 @@
-import heapq  # Import for k-nearest neighbors
+import heapq
 
 class KDTreeNode:
     def __init__(self, point, left=None, right=None):
-        self.point = point  # The 2D point (x, y) stored in this node
-        self.left = left    # Left subtree
-        self.right = right  # Right subtree
+        self.point = point
+        self.left = left
+        self.right = right
 
 
 class KDTree:

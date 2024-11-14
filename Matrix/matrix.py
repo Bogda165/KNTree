@@ -36,11 +36,7 @@ class Matrix:
                 break
 
 
-
-    #Function to draw the matrix with colored points
-
     def display_field(self):
-        """Display the field with colored points."""
         color_map = {
             -1: 'black',
             0: 'red',
